@@ -7,26 +7,19 @@ import random
 import requests
 from bs4 import BeautifulSoup
 
-URL2 = "https://www.vilajar.com/RentVilla/1/price-30000-2400000,home-0-3,sort-date-desc"
+# URL2 = "https://www.vilajar.com/RentVilla/22/price-30000-2400000,home-0-3,sort-date-desc"
 URL = "https://www.vilajar.com"
 
 
-def load_proxy():
-    f = open("proxy.json")
-    proxy = json.loads(f.read())
-    x = []
-    for i in proxy:
-        x.append({"http": f"socks4://{i['ip']}:{i['port']}"})
-    return x
+
+# if u have v2ray config and using nekoray, u can use this proxy
+proxies = {"https": "127.0.0.1:2081"}
+# else u have to make it empty like below line of code
+# proxies = {}
 
 
-proxy = load_proxy()
-print(proxy[0])
-# random.choice(proxy)
-
-
-def get_users_url() -> list[str]:
-    page = requests.get(URL2).content.decode()
+def get_users_url(url) -> list[str]:
+    page = requests.get(url).content.decode()
     soup = BeautifulSoup(page, "html.parser")
     villaBox = soup.find(id="villaBox")
     villa_item = villaBox.find_all("figure", class_="villa-item")
@@ -39,8 +32,12 @@ def get_users_url() -> list[str]:
 def get_phone(user_page) -> tuple[str]:
     header = {"User-Agent": fake_useragent.UserAgent().random}
     req = requests.Session()
-    print(dict(http=f'socks4://{random.choice(proxy)}'))
-    page = req.get(user_page, headers=header, proxies=random.choice(proxy)).content.decode()
+    req = req.get(user_page, headers=header, proxies=proxies)
+    page = req.content.decode()
+    print(req.status_code)
+    if req.status_code == 429:
+        print("Too Many Requests")
+        sleep(15)
     soup2 = BeautifulSoup(page, "html.parser")
     span = soup2.find("span", class_="ms-2 d-flex")
     phone_number = span.get_text(strip=True).replace("موبایل", "")
@@ -94,17 +91,25 @@ def put_in_json(data):
     f.write(str(_all))
 
 
-class TooManyRequests(Exception):
-    """Too Many Requests"""
+count = 0
+# get data from from page 93 to 127
+for j in range(93, 127):
+    url = f"https://www.vilajar.com/RentVilla/{j}/price-30000-2400000,home-0-3,sort-date-desc"
+    main_page = get_users_url(url)
+    for k, i in enumerate(main_page):
+        try:
+            data = get_phone(URL + i)
+            put_in_db(data)
+            count += 1
+            print(count)
+        except KeyboardInterrupt:
+            exit()
+        except:
+            pass
 
-
-main_page = get_users_url()
-
-for k, i in enumerate(main_page):
-    try:
-        print(k + 1)
-        data = get_phone(URL + i)
-        put_in_db(data)
-    except AttributeError:
-        print("Error")
-        sleep(60 * 6)
+"""
+first comment above code from first of for loop
+then uncomment blow code to insert all data from
+database to a json file.
+"""
+# put_in_json(get_from_db())
